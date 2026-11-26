@@ -1,3 +1,5 @@
+> Historical notes for the first visual pass. The current compiler atlas and inspection API are documented in [visual-insights.md](visual-insights.md).
+
 # Compiler field reference and parser audit
 
 The project is a Rust library, so its public-facing surface is a developer
