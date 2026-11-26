@@ -1,3 +1,5 @@
+![es-keyword-query compiler pipeline](docs/images/cover.svg)
+
 # es-keyword-query
 
 A compact boolean keyword syntax that compiles to an Elasticsearch / OpenSearch
@@ -15,6 +17,10 @@ becomes
 ```
 ("apple" OR ("apple pie"~20)) AND "store" NOT "rumor"
 ```
+
+[Browse the offline field reference](docs/index.html) · [API docs: `cargo doc --open`](#development)
+
+![Reference page with verified compilation examples](docs/images/reference-desktop.png)
 
 ## Syntax
 
@@ -61,6 +67,19 @@ Put the result in a `query_string` query:
 { "query": { "query_string": { "query": "<output>", "fields": ["title", "content"] } } }
 ```
 
+## Composing filters
+
+`filtered_by` groups **both** expressions before joining them with AND. This
+keeps a filter containing OR from leaking into the main query:
+
+```rust
+use es_keyword_query::Query;
+let search = Query::parse("tea|coffee")?;
+let filter = Query::parse("shop|cafe")?;
+assert_eq!(search.filtered_by(&filter),
+    r#"("shop" OR "cafe") AND ("tea" OR "coffee")"#);
+```
+
 ## Errors
 
 `Query::parse` returns an `Error` with a `kind`, the character `position`, and a
@@ -78,6 +97,7 @@ message in English (`message()`, also `Display`) and Traditional Chinese
 | `*` | `LoneWildcard` |
 | `a**` | `ConsecutiveWildcards` |
 | a comma, when `Comma::Reject` is set | `Comma` |
+| more than 128 nested groups | `NestingTooDeep` |
 
 ## Commas
 
@@ -86,9 +106,26 @@ input on top-level commas instead: `a,b|c` becomes `("a") OR ("b" OR "c")`.
 
 ## Development
 
+The crate has one runtime dependency, `unicode-normalization`. It does not
+connect to a search cluster or execute searches. Query behavior still depends
+on the target engine's fields and analyzers; proximity slop is not a character
+count. Raw mode intentionally passes Lucene syntax through and is not an
+escaping boundary for untrusted input.
+
+The responsive [field reference](docs/index.html) opens directly in a browser,
+requires no build or server, and displays three fixed examples covered by Rust
+tests. It is a reference, not an in-browser implementation of the parser.
+The [SVG cover](docs/images/cover.svg) is an editable compiler diagram.
+
 ```
-cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo doc --no-deps --open
 ```
+
+[Design and audit notes](docs/design-and-audit.md) describe the layout, parser
+fixes, and validation scope.
 
 ## License
 

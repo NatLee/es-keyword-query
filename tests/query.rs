@@ -127,7 +127,7 @@ fn terms_and_filter() {
     let filter = Query::parse("x|y").unwrap();
     assert_eq!(
         q.filtered_by(&filter),
-        r#""x" OR "y" AND (("a" OR ("b c"~20)) AND "d" NOT "e")"#
+        r#"("x" OR "y") AND (("a" OR ("b c"~20)) AND "d" NOT "e")"#
     );
 }
 
@@ -172,4 +172,38 @@ fn error_reports_position_and_messages() {
     );
     assert!(validate("a|b").is_ok());
     assert!(validate("a|").is_err());
+}
+
+#[test]
+fn grouped_filter_does_not_leak_or_into_the_query() {
+    let q = Query::parse("tea|coffee").unwrap();
+    let filter = Query::parse("shop|cafe").unwrap();
+    assert_eq!(
+        q.filtered_by(&filter),
+        r#"("shop" OR "cafe") AND ("tea" OR "coffee")"#
+    );
+}
+
+#[test]
+fn nesting_limit_rejects_adversarial_input_without_recursing_unboundedly() {
+    let accepted = format!("{}tea{}", "(".repeat(128), ")".repeat(128));
+    assert_eq!(Query::parse(&accepted).unwrap().terms(), ["tea"]);
+    let rejected = format!("{}tea{}", "(".repeat(10_000), ")".repeat(10_000));
+    let error = Query::parse(&rejected).unwrap_err();
+    assert_eq!(error.kind, ErrorKind::NestingTooDeep);
+    assert_eq!(error.position, 129);
+}
+
+#[test]
+fn reference_examples_match_the_compiler() {
+    for (input, output) in [
+        (
+            "(tea|coffee)&shop!ad",
+            r#"("tea" OR "coffee") AND "shop" NOT "ad""#,
+        ),
+        ("(apple pie ~5)&bakery", r#"("apple pie"~5) AND "bakery""#),
+        ("（茶｜咖啡）＆店", r#"("茶" OR "咖啡") AND "店""#),
+    ] {
+        assert_eq!(Query::parse(input).unwrap().to_query_string(), output);
+    }
 }
