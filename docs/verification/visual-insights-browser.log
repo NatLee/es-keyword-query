@@ -1,0 +1,16 @@
+{
+  "specimens": 8,
+  "modes": 2,
+  "filter_outputs": 14,
+  "stages": "passed",
+  "node_selection": "passed",
+  "export": "passed",
+  "widths": [
+    320,
+    390,
+    768,
+    1024,
+    1440
+  ],
+  "page_errors": []
+}

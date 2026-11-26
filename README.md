@@ -18,9 +18,9 @@ becomes
 ("apple" OR ("apple pie"~20)) AND "store" NOT "rumor"
 ```
 
-[Browse the offline field reference](docs/index.html) · [API docs: `cargo doc --open`](#development)
+[Open the interactive compiler atlas](docs/index.html) · [API docs: `cargo doc --open`](#development)
 
-![Reference page with verified compilation examples](docs/images/reference-desktop.png)
+![Compiler atlas with a Rust-generated grouping diagram](docs/images/reference-desktop.png)
 
 ## Syntax
 
@@ -112,10 +112,45 @@ on the target engine's fields and analyzers; proximity slop is not a character
 count. Raw mode intentionally passes Lucene syntax through and is not an
 escaping boundary for untrusted input.
 
-The responsive [field reference](docs/index.html) opens directly in a browser,
-requires no build or server, and displays three fixed examples covered by Rust
-tests. It is a reference, not an in-browser implementation of the parser.
-The [SVG cover](docs/images/cover.svg) is an editable compiler diagram.
+The [compiler atlas](docs/index.html) opens directly in a browser, works offline,
+and explores **eight finite Rust-generated specimens**. Select a clause in the
+branch diagram, follow normalization → structure → compilation, switch precise/raw
+output, and compose a grouped filter. Copy the compiled query or export its JSON
+inspection. It does not compile arbitrary input in the browser.
+
+For arbitrary expressions, use the local CLI:
+
+```sh
+cargo run --example inspect -- '(tea|coffee)&shop!ad'
+cargo run --example inspect -- '(apple pie ~)' --raw --slop=5
+```
+
+It prints JSON with `valid`, compiled output, normalized input and a flat clause
+list, or a structured syntax error (exit status 1). Unknown options exit with 2.
+
+The same inspection is available in Rust:
+
+```rust
+let query = es_keyword_query::Query::parse("(tea|coffee)&shop")?;
+let clauses = query.clauses();
+assert_eq!(clauses[1].parent, Some(0));
+assert_eq!(clauses[2].joiner, Some(es_keyword_query::Joiner::Or));
+```
+
+`Clause` records parent indices, node kind, direct exclusion, joiner, normalized
+term, resolved phrase slop and exact leaf output. It preserves written structure;
+it does not infer Boolean precedence or predict engine results.
+
+Regenerate the checked-in atlas data after parser changes:
+
+```sh
+cargo run --example build_atlas
+cargo run --example build_atlas -- --check
+```
+
+The library retains one runtime dependency. `serde_json` is used only by development
+examples. The [SVG cover](docs/images/cover.svg) is editable. [Visual insights notes](docs/visual-insights.md)
+cover the design, reading order, tests and browser verification.
 
 ```
 cargo fmt --check
