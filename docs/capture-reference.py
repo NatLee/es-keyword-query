@@ -45,12 +45,34 @@ with sync_playwright() as p:
     for width in [320, 390, 768, 1024, 1440]:
         page.set_viewport_size({'width': width, 'height': 1100})
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
-    page.screenshot(path=str(root / 'docs/images/reference-desktop.png'), full_page=True)
-    page.locator('#theme').click()
-    expect(page.locator('html')).to_have_class('light')
-    page.screenshot(path=str(root / 'docs/images/reference-light.png'), full_page=True)
-    page.set_viewport_size({'width': 390, 'height': 844})
-    page.screenshot(path=str(root / 'docs/images/reference-mobile.png'), full_page=True)
+    page.close()
+
+    # Capture in fresh contexts at the final viewport. Reusing the responsive
+    # test page can make Chrome repeat a stale compositor tile in full-page PNGs.
+    for filename, theme, viewport in [
+        ('reference-desktop.png', 'dark', {'width': 1440, 'height': 1100}),
+        ('reference-light.png', 'light', {'width': 1440, 'height': 1100}),
+        ('reference-mobile.png', 'light', {'width': 390, 'height': 844}),
+    ]:
+        context = browser.new_context(viewport=viewport, reduced_motion='reduce')
+        context.add_init_script(f"localStorage.setItem('atlas-theme', '{theme}')")
+        capture = context.new_page()
+        capture.on('pageerror', lambda error: errors.append(str(error)))
+        capture.goto((root / 'docs/index.html').as_uri(), wait_until='networkidle')
+        capture.locator('#specimens button').nth(3).click()
+        capture.locator('.node').nth(6).click()
+        expect(capture.locator('#compiled')).to_have_text(data[3]['modes'][0]['query_string'])
+        expect(capture.locator('header')).to_have_count(1)
+        expect(capture.locator('main')).to_have_count(1)
+        expect(capture.locator('footer')).to_have_count(1)
+        assert capture.locator('html').evaluate('(e) => e.classList.contains("light")') == (theme == 'light')
+        capture.evaluate('document.fonts.ready')
+        capture.evaluate('window.scrollTo(0, 0)')
+        capture.mouse.move(0, 0)
+        capture.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+        assert capture.evaluate('document.documentElement.scrollWidth <= innerWidth')
+        capture.screenshot(path=str(root / 'docs/images' / filename), full_page=True, animations='disabled')
+        context.close()
     assert not errors, errors
-    print(json.dumps({'specimens': 8, 'modes': 2, 'filter_outputs': 14, 'stages': 'passed', 'node_selection': 'passed', 'export': 'passed', 'widths': [320, 390, 768, 1024, 1440], 'page_errors': errors}, indent=2))
+    print(json.dumps({'specimens': 8, 'modes': 2, 'filter_outputs': 14, 'stages': 'passed', 'node_selection': 'passed', 'export': 'passed', 'widths': [320, 390, 768, 1024, 1440], 'captures': '3 fresh contexts; fonts and paint settled', 'page_errors': errors}, indent=2))
     browser.close()
