@@ -1,2 +1,9 @@
 /target
 .DS_Store
+
+/server/target/
+/crates/access-kit/target/
+/data/
+*.db
+*.db-wal
+*.db-shm

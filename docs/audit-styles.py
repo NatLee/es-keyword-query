@@ -2,11 +2,11 @@
 from pathlib import Path
 import re
 ROOT=Path(__file__).resolve().parents[1]
-SOURCES=[ROOT/'docs/atlas.css', ROOT/'docs/index.html', ROOT/'docs/images/src/cover.html']
+SOURCES=[ROOT/'docs/atlas.css', ROOT/'docs/index.html', ROOT/'docs/images/src/cover.html', *list((ROOT/'server/web').glob('*'))]
 issues=[]
 scanned=0
 for p in SOURCES:
- if not p.is_file() or '.test.' in p.name or p.suffix not in {'.css','.tsx','.html'}: continue
+ if not p.is_file() or '.test.' in p.name or p.suffix not in {'.css','.tsx','.html','.mjs'}: continue
  scanned+=1
  s=p.read_text()
  def record(m,reason): issues.append(f"{p.relative_to(ROOT)}:{s[:m.start()].count(chr(10))+1}: {reason}: {m[0]}")
