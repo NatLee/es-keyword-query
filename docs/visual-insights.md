@@ -2,7 +2,7 @@
 
 Goal: make the Rust compiler's structure explorable without pretending a static page runs arbitrary Rust code.
 
-The foundry uses cobalt blueprint paper or a true black/cyan drafting canvas, a technical specimen library, a selectable circuit tree and a four-step source → normalize → parse → compile production line. A locally bundled Barlow Condensed headline gives the page its engineering identity. Visitors choose finite verified specimens, switch precise/raw output, inspect a clause, and compose a grouped filter. A CLI example compiles arbitrary local input. The page explicitly labels its finite dataset and runs offline.
+The foundry uses cobalt blueprint paper or a dark ink/blue drafting canvas, a technical specimen library, a selectable circuit tree and a four-step source → normalize → parse → compile production line. System type at 400/600 keeps the compiler stages and clauses readable without an extra display weight. Visitors choose finite verified specimens, switch precise/raw output, inspect a clause, and compose a grouped filter. A CLI example compiles arbitrary local input. The page explicitly labels its finite dataset and runs offline.
 
 Architecture: `Query::clauses()` exposes a flat preorder view of the existing AST with parent indices, original joiners, direct negation, resolved phrase slop and compiled fragments. It does not infer Boolean precedence or execute a search. `examples/inspect.rs` emits JSON; `examples/build_atlas.rs` writes the verified fixture data used by the dependency-free browser page. JSON is a development dependency only. The same crate source is vendored into Keyword Vault.
 

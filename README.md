@@ -20,6 +20,11 @@ becomes
 
 [Open the Compiler Foundry](docs/index.html) · [API docs: `cargo doc --open`](#development)
 
+The source, stages, clause inspector and compiled artifact use distinct surfaces.
+Selection feedback lasts 160–180ms and follows the Rust-generated clauses; reduced
+motion immediately shows the final state. [Watch the actual workflow (WebM)](docs/images/feature-motion.webm).
+[Style, responsive and accessibility checks](docs/themed-motion-verification.md).
+
 ## A query through the foundry
 
 Open [Compiler Foundry](docs/index.html) and follow the same `Discovery` specimen,
