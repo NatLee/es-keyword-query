@@ -209,6 +209,26 @@ fixes, and validation scope.
 
 [MIT](LICENSE) © 2022 Nat Lee
 
+## Run the workbench with nginx
+
+```sh
+cp .env.example .env
+# Set ACCESS_SETUP_TOKEN in .env using: openssl rand -hex 32
+docker compose up -d --build
+```
+
+Open <http://127.0.0.1:8670>. The first-login form requires the deployment setup code to create the first administrator. After setup, remove the token from `.env` and recreate `api`; existing accounts and sessions remain in the SQLite volume.
+
+```mermaid
+flowchart LR
+  Browser[Browser / API / MCP] -->|:8670| Nginx[nginx]
+  Nginx --> Static[Compiler workbench assets]
+  Nginx --> API[Internal Rust API]
+  API --> SQLite[(SQLite volume)]
+```
+
+Only nginx publishes a host port. Keep `ACCESS_PUBLIC_URL` identical to the browser origin, including hostname and port. See [nginx deployment and verification](docs/nginx-deployment.md) for routes, proxy headers, streaming, logs and upgrades. The existing standalone server image and Rust library remain available.
+
 ## Account connections, API and MCP
 
 The library remains independent: its Cargo manifest and runtime dependency graph are unchanged. The optional server is a separate Rust 1.88+ package with SQLite accounts, password sessions and the native compiler workbench.
@@ -219,7 +239,9 @@ cargo run --manifest-path server/Cargo.toml --locked
 cargo run --manifest-path server/Cargo.toml --locked -- bootstrap demo
 ```
 
-The server defaults to `http://127.0.0.1:8670`; `ES_SERVER_BIND`, `ES_SERVER_DATA_DIR`, `ES_SERVER_DATABASE_PATH` and `ES_SERVER_STATIC_DIR` configure the listener, database and static files. On an empty installation, open the server to reach `/first-login`. Choose a username (3–32 letters, numbers, `_`, `.` or `-`), an optional display name (up to 40 characters), and a matching password and confirmation (8–200 characters). The first account becomes the administrator and signs in immediately. Setup then closes; `/first-login` returns to normal login or the signed-in workspace. Administrators create subsequent member accounts in Connections.
+The server defaults to `http://127.0.0.1:8670`; `ES_SERVER_BIND`, `ES_SERVER_DATA_DIR`, `ES_SERVER_DATABASE_PATH` and `ES_SERVER_STATIC_DIR` configure the listener, database and static files. On an empty installation, open the server to reach `/first-login`. Choose a username (3–32 letters, numbers, `_`, `.` or `-`), an optional display name (up to 40 characters), and a matching password and confirmation (8–200 characters). The first account becomes the administrator and signs in immediately. Setup then closes; `/first-login` returns to normal login or the signed-in workspace.
+
+Registration for subsequent accounts defaults to **Closed**. Administrators can change it in Connections to **Administrator approval** or **Open**, review pending requests with an approval or a rejection reason, and browse registration history. `/register` accepts a username (3–64 letters, numbers, `_`, `.` or `-`), optional display name (up to 100 characters), and matching password and confirmation (12–256 characters). All applicants become members. Approval requests receive no session or workspace access until approved; open registration signs the member in immediately. Closing registration leaves existing accounts working. Administrators can also create member accounts directly in Connections.
 
 HTTP first-account setup accepts real loopback peers without a deployment code. For Docker or another nonloopback deployment, configure `ACCESS_SETUP_TOKEN` with a cryptographically random secret of 32–512 characters in the server environment or a protected Docker env file, alongside the canonical `ACCESS_PUBLIC_URL`. The first-login form then asks for the **Deployment setup code**. Missing or incorrect codes are refused; an unset token keeps remote setup locked. Blank, short or oversized configured tokens prevent startup. Forwarded headers never turn a remote connection into loopback. The token is never returned by the state API, logged, placed in a URL or stored in browser storage. Remove it from deployment configuration after creating the administrator.
 
@@ -230,7 +252,7 @@ The CLI bootstrap remains available and reads its password from stdin until EOF.
 - `{origin}/oauth/callback/github`
 - `{origin}/oauth/callback/google`
 
-Sign into an existing local account first and link its provider identity in Connections. Provider login requires an existing binding; there is no automatic signup or email-based account merge. Missing provider configuration produces disabled native buttons with an explanation. Disconnecting cannot remove the final login method.
+Sign into an existing account and link a provider identity in Connections, or use a configured Google/GitHub button on `/register` when registration is enabled. Registration follows the same approval/open policy as password accounts. The normal sign-in buttons require an existing binding. Provider accounts use the provider's stable identity; accounts are never merged by email. Missing provider configuration produces disabled sign-in buttons with an explanation and no signup action. Disconnecting cannot remove the final login method.
 
 Connections creates a personal key with explicit scope (`queries:read`), audience (`{origin}/api/v1` and/or `{origin}/mcp`) and expiry. Copy its raw value once; closing the panel removes it from the UI, and it is never stored in browser storage. Revoke keys and OAuth grants from the same page. Only cookie sessions can manage connections, clients and consent.
 
@@ -245,5 +267,11 @@ Usage shows real UTC daily counts for 7/30/90 days, outcomes, transports and pen
 [First-login browser, Docker and security verification](docs/first-login-verification.md) includes fresh empty-database captures:
 
 ![First-entry administrator creation in Compiler Foundry](docs/images/first-login-light-1440.png)
+
+[Registration and administrator review verification](docs/registration-verification.md) records the registration browser checks and capture provenance.
+
+![Administrator review of a real pending member application](docs/images/registration-review-light-1440.png)
+
+[Mobile dark account review](docs/images/registration-review-dark-390.png)
 
 These are real local workflows with synthetic domain data and the feature-gated loopback provider, including signed Google OIDC verification. They do not claim live provider registration. [Access verification and reproduction](docs/access-verification.md) records tests, screenshot provenance and remaining deployment checks.

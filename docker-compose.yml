@@ -1,0 +1,37 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      ACCESS_PUBLIC_URL: ${ACCESS_PUBLIC_URL:-http://127.0.0.1:${ES_PORT:-8670}}
+      ACCESS_SETUP_TOKEN:
+      ACCESS_GITHUB_CLIENT_ID: ${ACCESS_GITHUB_CLIENT_ID:-}
+      ACCESS_GITHUB_CLIENT_SECRET: ${ACCESS_GITHUB_CLIENT_SECRET:-}
+      ACCESS_GOOGLE_CLIENT_ID: ${ACCESS_GOOGLE_CLIENT_ID:-}
+      ACCESS_GOOGLE_CLIENT_SECRET: ${ACCESS_GOOGLE_CLIENT_SECRET:-}
+      ES_SERVER_BIND: 0.0.0.0:8670
+      ES_SERVER_DATA_DIR: /app/data
+      ES_SERVER_STATIC_DIR: /app/web
+    expose:
+      - "8670"
+    volumes:
+      - compiler-data:/app/data
+    restart: unless-stopped
+  frontend:
+    build:
+      context: .
+      dockerfile: server/Dockerfile.nginx
+    ports:
+      - "${ES_PORT:-8670}:8080"
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+volumes:
+  compiler-data:

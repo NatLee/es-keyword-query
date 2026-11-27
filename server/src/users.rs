@@ -13,11 +13,13 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use sqlx::Row;
 pub async fn list(State(state): State<AppState>, _admin: Admin) -> AppResult<Json<Value>> {
-    let rows = sqlx::query("SELECT id,username,display_name,role,disabled FROM users ORDER BY id")
-        .fetch_all(&state.db)
-        .await?;
+    let rows = sqlx::query(
+        "SELECT id,username,display_name,role,disabled,account_status FROM users ORDER BY id",
+    )
+    .fetch_all(&state.db)
+    .await?;
     Ok(Json(
-        json!({"items":rows.iter().map(|r|json!({"id":r.get::<i64,_>("id"),"username":r.get::<String,_>("username"),"display_name":r.get::<String,_>("display_name"),"role":r.get::<String,_>("role"),"disabled":r.get::<i64,_>("disabled")!=0})).collect::<Vec<_>>()}),
+        json!({"items":rows.iter().map(|r|json!({"id":r.get::<i64,_>("id"),"username":r.get::<String,_>("username"),"display_name":r.get::<String,_>("display_name"),"role":r.get::<String,_>("role"),"disabled":r.get::<i64,_>("disabled")!=0,"account_status":r.get::<String,_>("account_status")})).collect::<Vec<_>>()}),
     ))
 }
 #[derive(Deserialize)]
