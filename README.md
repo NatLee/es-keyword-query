@@ -20,6 +20,11 @@ becomes
 
 [Open the Compiler Foundry](docs/index.html) · [API docs: `cargo doc --open`](#development)
 
+The source, stages, clause inspector and compiled artifact use distinct surfaces.
+Selection feedback lasts 160–180ms and follows the Rust-generated clauses; reduced
+motion immediately shows the final state. [Watch the actual workflow (WebM)](docs/images/feature-motion.webm).
+[Style, responsive and accessibility checks](docs/themed-motion-verification.md).
+
 ## A query through the foundry
 
 Open [Compiler Foundry](docs/index.html) and follow the same `Discovery` specimen,
@@ -203,3 +208,34 @@ fixes, and validation scope.
 ## License
 
 [MIT](LICENSE) © 2022 Nat Lee
+
+## Account connections, API and MCP
+
+The library remains independent: its Cargo manifest and runtime dependency graph are unchanged. The optional server is a separate Rust 1.88+ package with SQLite accounts, password sessions and the native compiler workbench.
+
+```sh
+cargo run --manifest-path server/Cargo.toml --locked
+# In another terminal, bootstrap the first administrator using password stdin:
+cargo run --manifest-path server/Cargo.toml --locked -- bootstrap demo
+```
+
+The server defaults to `http://127.0.0.1:8670`; `ES_SERVER_BIND`, `ES_SERVER_DATA_DIR`, `ES_SERVER_DATABASE_PATH` and `ES_SERVER_STATIC_DIR` configure the listener, database and static files. The bootstrap command reads stdin until EOF. HTTP first-account setup accepts only loopback peers; deployed containers should use the local bootstrap command. Administrators can create/disable local member accounts. Disabling an account invalidates its sessions and bearer access.
+
+`ACCESS_PUBLIC_URL` is the canonical origin used for issuer, resource, callback and same-origin checks. Use HTTPS in deployment; HTTPS forces Secure cookies. Configure GitHub with `ACCESS_GITHUB_CLIENT_ID` / `ACCESS_GITHUB_CLIENT_SECRET`, and Google with `ACCESS_GOOGLE_CLIENT_ID` / `ACCESS_GOOGLE_CLIENT_SECRET`. Register these exact callback URLs with the providers:
+
+- `{origin}/oauth/callback/github`
+- `{origin}/oauth/callback/google`
+
+Sign into an existing local account first and link its provider identity in Connections. Provider login requires an existing binding; there is no automatic signup or email-based account merge. Missing provider configuration produces disabled native buttons with an explanation. Disconnecting cannot remove the final login method.
+
+Connections creates a personal key with explicit scope (`queries:read`), audience (`{origin}/api/v1` and/or `{origin}/mcp`) and expiry. Copy its raw value once; closing the panel removes it from the UI, and it is never stored in browser storage. Revoke keys and OAuth grants from the same page. Only cookie sessions can manage connections, clients and consent.
+
+Domain operations are `compile_query`, `inspect_query`, `extract_terms`. API calls use `POST /api/v1/{operation}`, JSON arguments and `Authorization: Bearer <key-or-access-token>`; `/api/v1/openapi.json` describes the fixed schemas. No caller-supplied destination URL or identity header is supported. MCP uses Streamable HTTP at `/mcp`, negotiated version **2026-07-28**, discovery and normal SDK tool calls (no custom initialize payload). OAuth clients discover metadata, use authorization code + PKCE S256, exact resource/audience and the native immutable consent form; administrators register approved client redirect URIs in Connections. Public dynamic registration is disabled by default; set `ACCESS_DYNAMIC_CLIENT_REGISTRATION=true` only when needed. Admin registration remains available.
+
+Usage shows real UTC daily counts for 7/30/90 days, outcomes, transports and pending attempts. A real domain operation records one attempt across API/MCP; discovery, management and rejected credentials do not inflate usage. Detailed audit retention is 90 days. Event payloads omit raw keys, tokens and domain arguments/results. Legacy HTTP spans record method and matched route patterns; access routes and internal dispatch avoid payload tracing.
+
+![Personal key metadata after the raw value was closed](docs/images/access-01.png)
+![Actual local API and MCP usage](docs/images/access-02.png)
+![Native OAuth consent](docs/images/access-03.png)
+
+These are real local workflows with synthetic domain data and the feature-gated loopback provider, including signed Google OIDC verification. They do not claim live provider registration. [Access verification and reproduction](docs/access-verification.md) records tests, screenshot provenance and remaining deployment checks.
