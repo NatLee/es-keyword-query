@@ -219,7 +219,11 @@ cargo run --manifest-path server/Cargo.toml --locked
 cargo run --manifest-path server/Cargo.toml --locked -- bootstrap demo
 ```
 
-The server defaults to `http://127.0.0.1:8670`; `ES_SERVER_BIND`, `ES_SERVER_DATA_DIR`, `ES_SERVER_DATABASE_PATH` and `ES_SERVER_STATIC_DIR` configure the listener, database and static files. The bootstrap command reads stdin until EOF. HTTP first-account setup accepts only loopback peers; deployed containers should use the local bootstrap command. Administrators can create/disable local member accounts. Disabling an account invalidates its sessions and bearer access.
+The server defaults to `http://127.0.0.1:8670`; `ES_SERVER_BIND`, `ES_SERVER_DATA_DIR`, `ES_SERVER_DATABASE_PATH` and `ES_SERVER_STATIC_DIR` configure the listener, database and static files. On an empty installation, open the server to reach `/first-login`. Choose a username (3–32 letters, numbers, `_`, `.` or `-`), an optional display name (up to 40 characters), and a matching password and confirmation (8–200 characters). The first account becomes the administrator and signs in immediately. Setup then closes; `/first-login` returns to normal login or the signed-in workspace. Administrators create subsequent member accounts in Connections.
+
+HTTP first-account setup accepts real loopback peers without a deployment code. For Docker or another nonloopback deployment, configure `ACCESS_SETUP_TOKEN` with a cryptographically random secret of 32–512 characters in the server environment or a protected Docker env file, alongside the canonical `ACCESS_PUBLIC_URL`. The first-login form then asks for the **Deployment setup code**. Missing or incorrect codes are refused; an unset token keeps remote setup locked. Blank, short or oversized configured tokens prevent startup. Forwarded headers never turn a remote connection into loopback. The token is never returned by the state API, logged, placed in a URL or stored in browser storage. Remove it from deployment configuration after creating the administrator.
+
+The CLI bootstrap remains available and reads its password from stdin until EOF. It creates only the initial administrator and does not open a listener. Administrators can create/disable local member accounts. Disabling an account invalidates its sessions and bearer access.
 
 `ACCESS_PUBLIC_URL` is the canonical origin used for issuer, resource, callback and same-origin checks. Use HTTPS in deployment; HTTPS forces Secure cookies. Configure GitHub with `ACCESS_GITHUB_CLIENT_ID` / `ACCESS_GITHUB_CLIENT_SECRET`, and Google with `ACCESS_GOOGLE_CLIENT_ID` / `ACCESS_GOOGLE_CLIENT_SECRET`. Register these exact callback URLs with the providers:
 
@@ -237,5 +241,9 @@ Usage shows real UTC daily counts for 7/30/90 days, outcomes, transports and pen
 ![Personal key metadata after the raw value was closed](docs/images/access-01.png)
 ![Actual local API and MCP usage](docs/images/access-02.png)
 ![Native OAuth consent](docs/images/access-03.png)
+
+[First-login browser, Docker and security verification](docs/first-login-verification.md) includes fresh empty-database captures:
+
+![First-entry administrator creation in Compiler Foundry](docs/images/first-login-light-1440.png)
 
 These are real local workflows with synthetic domain data and the feature-gated loopback provider, including signed Google OIDC verification. They do not claim live provider registration. [Access verification and reproduction](docs/access-verification.md) records tests, screenshot provenance and remaining deployment checks.

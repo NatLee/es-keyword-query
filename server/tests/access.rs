@@ -53,6 +53,7 @@ async fn standalone_bootstrap_compile_key_revoke_and_disabled_identity() {
         static_dir: dir.path().join("web"),
         public_origin: Some("http://127.0.0.1:8670".into()),
         cookie_secure: false,
+        setup_token: None,
         default_slop: 20,
     })
     .await
@@ -202,6 +203,7 @@ async fn official_sdk_compiles_same_library_output_and_rechecks_account_and_revo
         static_dir: dir.path().join("web"),
         public_origin: Some(origin.clone()),
         cookie_secure: false,
+        setup_token: None,
         default_slop: 20,
     })
     .await
@@ -351,6 +353,7 @@ async fn bootstrap_is_local_only_and_bearer_cannot_manage_accounts() {
         static_dir: dir.path().join("web"),
         public_origin: Some("http://127.0.0.1:8670".into()),
         cookie_secure: false,
+        setup_token: None,
         default_slop: 20,
     })
     .await

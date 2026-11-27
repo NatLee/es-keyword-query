@@ -25,6 +25,7 @@ const field = (label, type = "text", value = "") => {
   const input = el(type === "textarea" ? "textarea" : "input");
   if (type !== "textarea") input.type = type;
   input.value = value;
+  input.setAttribute("aria-label", label);
   wrap.append(input);
   return { wrap, input };
 };
@@ -56,7 +57,11 @@ async function api(path, method = "GET", body) {
   });
   if (r.status === 204) return null;
   const data = await r.json();
-  if (!r.ok) throw new Error(data.error || `Request failed (${r.status})`);
+  if (!r.ok) {
+    const error = new Error(data.error || `Request failed (${r.status})`);
+    error.status = r.status;
+    throw error;
+  }
   return data;
 }
 function showError(error) {
@@ -147,79 +152,137 @@ function renderAccount() {
     }),
   );
 }
-function login(setupRequired) {
+function firstLogin(auth) {
   main.replaceChildren();
-  const node = section(
-    "LOCAL ACCOUNT / SERVER EDITION",
-    setupRequired ? "Set up Compiler Foundry" : "Sign in",
+  const layout = el("div", "first-login-layout");
+  const intro = el("section", "first-login-intro");
+  intro.append(
+    el("p", "kicker", "COMPILER FOUNDRY / FIRST ENTRY"),
+    el("h1", "", "One account. Your foundry."),
+    el("p", "", "Turn keyword expressions into explicit logic. Create the first administrator to open your compiler workspace."),
   );
+  const steps = el("ol", "first-login-steps");
+  for (const [title, detail] of [
+    ["Establish your identity", "Choose a local username and a password you will use to sign in."],
+    ["Open the workspace", "Your first account becomes the administrator and signs in immediately."],
+    ["Bring your team", "Add member accounts later from Connections. This page closes after setup."],
+  ]) {
+    const step = el("li");
+    step.append(el("strong", "", title), el("p", "", detail));
+    steps.append(step);
+  }
+  intro.append(steps, el("p", "first-login-mark", "( identity & access ) → workspace"));
+  layout.append(intro);
+  const node = el("section", "section login first-login-form");
+  const header = el("header");
+  header.append(el("p", "kicker", "01 / INITIAL ADMINISTRATOR"), el("h2", "", "Create your first administrator"));
+  node.append(header, el("p", "", "This installation has no accounts yet. Your credentials stay with this server."));
+  layout.append(node);
+  main.append(layout);
+  accountForm(node, auth);
+}
+function login() {
+  main.replaceChildren();
+  const node = section("LOCAL ACCOUNT / SERVER EDITION", "Sign in");
   node.classList.add("login");
-  const form = el("form");
+  accountForm(node);
+  const providers = el("div");
+  providers.append(el("h3", "", "Linked external identities"));
+  node.append(providers);
+  void providerButtons(providers);
+  providerError();
+}
+function accountForm(node, setup) {
+  const form = el("form", "stack");
   const user = field("Username"),
     display = field("Display name"),
-    password = field("Password", "password");
+    password = field("Password", "password"),
+    confirm = field("Confirm password", "password"),
+    setupToken = field("Deployment setup code", "password");
   user.input.required = true;
   user.input.autocomplete = "username";
+  user.input.minLength = 3;
+  user.input.maxLength = 32;
+  user.input.pattern = "[A-Za-z0-9_.\\-]{3,32}";
+  user.input.spellcheck = false;
   password.input.required = true;
   password.input.minLength = 8;
   password.input.maxLength = 200;
-  password.input.autocomplete = setupRequired
-    ? "new-password"
-    : "current-password";
+  password.input.autocomplete = setup ? "new-password" : "current-password";
   form.append(user.wrap);
-  if (setupRequired) {
-    form.append(
-      display.wrap,
-      el(
-        "p",
-        "",
-        "First-administrator setup accepts loopback requests only. Create the account locally before publishing this service.",
-      ),
-    );
+  if (setup) {
+    user.wrap.append(el("small", "", "3–32 letters, numbers, underscores, dots or hyphens."));
+    display.input.maxLength = 40;
+    display.input.autocomplete = "nickname";
+    display.wrap.append(el("small", "", "Optional. Up to 40 characters; defaults to your username."));
+    form.append(display.wrap);
   }
   form.append(password.wrap);
-  const submit = el(
-    "button",
-    "primary",
-    setupRequired ? "Create administrator" : "Sign in",
-  );
+  if (setup) {
+    password.wrap.append(el("small", "", "Use 8–200 characters."));
+    confirm.input.required = true;
+    confirm.input.autocomplete = "new-password";
+    confirm.input.minLength = 8;
+    confirm.input.maxLength = 200;
+    form.append(confirm.wrap);
+    if (setup.setup_token_required && setup.setup_token_configured) {
+      setupToken.input.required = true;
+      setupToken.input.autocomplete = "off";
+      setupToken.input.maxLength = 512;
+      setupToken.wrap.append(el("small", "", "Use the code configured by your deployment operator. It is used only for this first account."));
+      form.append(setupToken.wrap);
+    } else if (setup.setup_token_required) {
+      const notice = el("p", "notice", "Remote setup is locked. Open this service on its loopback interface, use CLI bootstrap, or ask the deployment operator to configure ACCESS_SETUP_TOKEN.");
+      notice.role = "status";
+      form.append(notice);
+    }
+  }
+  const submit = el("button", "primary", setup ? "Create administrator" : "Sign in");
   submit.type = "submit";
+  const locked = setup?.setup_token_required && !setup.setup_token_configured;
+  submit.disabled = Boolean(locked);
   form.append(submit);
+  let busy = false;
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (busy || locked) return;
+    if (setup && password.input.value !== confirm.input.value) {
+      showError(new Error("Passwords do not match. Enter the same password twice."));
+      confirm.input.focus();
+      return;
+    }
+    busy = true;
     submit.disabled = true;
+    form.setAttribute("aria-busy", "true");
+    submit.textContent = setup ? "Creating administrator…" : "Signing in…";
+    document.querySelector("#page-error")?.remove();
     try {
-      currentUser = await api(
-        setupRequired ? "/api/auth/setup" : "/api/auth/login",
-        "POST",
-        {
-          username: user.input.value.trim(),
-          password: password.input.value,
-          ...(setupRequired
-            ? { display_name: display.input.value.trim() || undefined }
-            : {}),
-        },
-      );
-      password.input.value = "";
-      location.assign(
-        nextAuthorize() ??
-          (location.pathname === "/connections" ? "/connections" : "/"),
-      );
+      currentUser = await api(setup ? "/api/auth/setup" : "/api/auth/login", "POST", {
+        username: user.input.value.trim(),
+        password: password.input.value,
+        ...(setup ? {
+          display_name: display.input.value.trim() || undefined,
+          ...(setup.setup_token_required ? { setup_token: setupToken.input.value } : {}),
+        } : {}),
+      });
+      password.input.value = confirm.input.value = setupToken.input.value = "";
+      location.assign(nextAuthorize() ?? "/");
     } catch (error) {
-      password.input.value = "";
+      password.input.value = confirm.input.value = setupToken.input.value = "";
+      if (setup && error.status === 409) {
+        const next = nextAuthorize();
+        location.replace("/login" + (next ? `?next=${encodeURIComponent(next)}` : ""));
+        return;
+      }
       showError(error);
     } finally {
-      submit.disabled = false;
+      busy = false;
+      submit.disabled = Boolean(locked);
+      form.setAttribute("aria-busy", "false");
+      submit.textContent = setup ? "Create administrator" : "Sign in";
     }
   });
   node.append(form);
-  if (!setupRequired) {
-    const providers = el("div");
-    providers.append(el("h3", "", "Linked external identities"));
-    node.append(providers);
-    void providerButtons(providers);
-  }
-  providerError();
 }
 async function compiler() {
   main.replaceChildren();
@@ -924,18 +987,31 @@ async function members() {
     target.append(row);
   }
 }
-try {
-  const auth = await api("/api/auth/state");
+async function routeAuth(auth) {
   currentUser = auth.user;
   renderAccount();
-  if (!currentUser) login(auth.setup_required);
-  else {
-    const next = nextAuthorize();
-    if (location.pathname === "/login" && next) location.replace(next);
-    else if (location.pathname === "/consent") await consent();
-    else if (location.pathname === "/connections") await connections();
-    else await compiler();
-  }
+  const next = nextAuthorize();
+  const continuation = next ? `?next=${encodeURIComponent(next)}` : "";
+  if (!currentUser) {
+    const code = new URLSearchParams(location.search).get("access_error");
+    const providerNotice = !auth.setup_required && code && Object.hasOwn(providerErrors, code)
+      ? `${continuation ? "&" : "?"}access_error=${encodeURIComponent(code)}`
+      : "";
+    const target = (auth.setup_required ? "/first-login" : "/login") + continuation + providerNotice;
+    if (location.pathname + location.search !== target) {
+      location.replace(target);
+      return;
+    }
+    if (auth.setup_required) firstLogin(auth);
+    else login();
+  } else if (["/login", "/first-login"].includes(location.pathname)) {
+    location.replace(next ?? "/");
+  } else if (location.pathname === "/consent") await consent();
+  else if (location.pathname === "/connections") await connections();
+  else await compiler();
+}
+try {
+  await routeAuth(await api("/api/auth/state"));
 } catch (error) {
   showError(error);
 }
