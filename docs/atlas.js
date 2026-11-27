@@ -195,12 +195,16 @@
     const area = $("#stage-panel"),
       r = result();
     area.replaceChildren();
-    document
-      .querySelectorAll("[data-stage]")
-      .forEach((b) =>
-        b.setAttribute("aria-selected", String(b.dataset.stage === stage)),
-      );
-    if (!r.valid && stage !== "normalize") {
+    document.querySelectorAll("[data-pipeline]").forEach((item) => {
+      if (item.dataset.pipeline === stage)
+        item.setAttribute("aria-current", "step");
+      else item.removeAttribute("aria-current");
+    });
+    document.querySelectorAll("[data-stage]").forEach((b) => {
+      b.setAttribute("aria-selected", String(b.dataset.stage === stage));
+      b.tabIndex = b.dataset.stage === stage ? 0 : -1;
+    });
+    if (!r.valid && stage !== "normalize" && stage !== "source") {
       const panel = el("div", "error-pane");
       panel.append(
         el("h3", "", "A useful stop."),
@@ -215,19 +219,31 @@
         el(
           "span",
           "",
-          stage === "normalize"
-            ? "NFKC / NORMALIZED INPUT"
-            : "EMITTED / QUERY_STRING",
+          stage === "source"
+            ? "ORIGINAL / UNMODIFIED INPUT"
+            : stage === "normalize"
+              ? "NFKC / NORMALIZED INPUT"
+              : "EMITTED / QUERY_STRING",
         ),
-        el("pre", "", stage === "normalize" ? r.normalized : r.query_string),
+        el(
+          "pre",
+          "",
+          stage === "source"
+            ? data[specimen].input
+            : stage === "normalize"
+              ? r.normalized
+              : r.query_string,
+        ),
         el(
           "p",
           "",
-          stage === "normalize"
-            ? "Full-width forms are normalized before parsing. Operators retain their written order. The parser also trims outer whitespace and removes control characters U+0001–U+001A."
-            : mode === 0
-              ? "Every ordinary term is quoted. Proximity phrases carry their resolved slop."
-              : "Ordinary terms pass through to Lucene. Proximity phrases are still quoted.",
+          stage === "source"
+            ? "This exact input is passed to the Rust parser. Choose Normalize to compare the standardized input, then inspect the grouping before compilation."
+            : stage === "normalize"
+              ? "Full-width forms are normalized before parsing. Operators retain their written order. The parser also trims outer whitespace and removes control characters U+0001–U+001A."
+              : mode === 0
+                ? "Every ordinary term is quoted. Proximity phrases carry their resolved slop."
+                : "Ordinary terms pass through to Lucene. Proximity phrases are still quoted.",
         ),
       );
       area.append(panel);
@@ -245,6 +261,17 @@
   }
   function render() {
     const item = data[specimen];
+    const r = result();
+    $("#pipeline-source").textContent =
+      `${Array.from(item.input).length} characters`;
+    $("#pipeline-normalize").textContent =
+      item.input === r.normalized ? "No changes needed" : "NFKC transformed";
+    $("#pipeline-parse").textContent = r.valid
+      ? `${r.clauses.length} clauses assembled`
+      : "Syntax error found";
+    $("#pipeline-compile").textContent = r.valid
+      ? `${mode === 0 ? "Precise" : "Raw"} · ready to export`
+      : "Release blocked";
     $("#specimen-title").textContent = item.title;
     $("#specimen-number").textContent =
       `SPECIMEN ${String(specimen + 1).padStart(2, "0")} / 08`;
@@ -266,6 +293,24 @@
         renderStage();
       }),
   );
+  document.querySelector(".stages").onkeydown = (event) => {
+    const tabs = [...document.querySelectorAll("[data-stage]")];
+    const index = tabs.findIndex((tab) => tab.dataset.stage === stage);
+    const next =
+      event.key === "ArrowRight"
+        ? (index + 1) % tabs.length
+        : event.key === "ArrowLeft"
+          ? (index + tabs.length - 1) % tabs.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? tabs.length - 1
+              : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    tabs[next].click();
+    tabs[next].focus();
+  };
   $("#mode").onchange = (e) => {
     mode = Number(e.target.value);
     render();
