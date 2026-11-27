@@ -1,4 +1,4 @@
-![Compiler Foundry: a Rust-verified blueprint of query compilation](docs/images/reference-light.png)
+![es-keyword-query — Small syntax. Explicit logic.](docs/images/cover.png)
 
 # es-keyword-query
 
@@ -20,9 +20,40 @@ becomes
 
 [Open the Compiler Foundry](docs/index.html) · [API docs: `cargo doc --open`](#development)
 
-<details><summary>Dark drafting canvas</summary>
+## A query through the foundry
 
-![Compiler Foundry with a Rust-generated grouping diagram](docs/images/reference-desktop.png)
+Open [Compiler Foundry](docs/index.html) and follow the same `Discovery` specimen,
+`(tea|coffee)&shop!ad`, through these three steps. These are real captures of the
+checked-in Rust-generated atlas, not a live search cluster. The browser explores
+eight finite examples; use the [CLI](#development) for arbitrary expressions.
+
+**1. Choose the source.** Select **Discovery**, then **00 Source**. The source panel
+shows the unchanged expression; the initial Precise mode quotes each term.
+
+![Step 1: Discovery selected with its original expression and precise output](docs/images/workflow-01.png)
+
+**2. Read the structure and change the output mode.** Open **02 Structure**, select
+**ad** (click, or focus and press Enter), and choose **Raw · pass through**. The
+inspector identifies a direct exclusion; ordinary terms now pass through unquoted.
+The selected source remains unchanged.
+
+![Step 2: ad selected as a direct exclusion and Raw mode emits unquoted terms](docs/images/workflow-02.png)
+
+**3. Compose and export.** Open **03 Compile**, choose **Phrase distance** under
+**Restrict with a filter**, then **Export inspection**. Both expressions are grouped
+before AND. The downloaded JSON's `query_string` matches the displayed output and
+retains the Discovery source. This image is a crop of the actual release workbench.
+
+![Step 3: Phrase distance filter composed with the same Discovery query](docs/images/workflow-03.png)
+
+[Reproduce these captures and inspect the checks](docs/workflow-verification.md).
+The separate [editable cover](docs/images/src/cover.html) is repository artwork.
+
+<details><summary>Full application gallery · light, dark and mobile</summary>
+
+![Light Compiler Foundry](docs/images/reference-light.png)
+![Dark Compiler Foundry with a Rust-generated grouping diagram](docs/images/reference-desktop.png)
+<img src="docs/images/reference-mobile.png" alt="Mobile Compiler Foundry" width="390">
 
 </details>
 
@@ -156,7 +187,7 @@ cargo run --example build_atlas -- --check
 ```
 
 The library retains one runtime dependency. `serde_json` is used only by development
-examples. The README cover is an actual application capture. [Visual insights notes](docs/visual-insights.md)
+examples. The README opens with a separate illustrated cover; the walkthrough and gallery are actual application captures. [Visual insights notes](docs/visual-insights.md)
 cover the design, reading order, tests and browser verification.
 
 ```
