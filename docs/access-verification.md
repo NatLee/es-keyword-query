@@ -34,3 +34,7 @@ Root reviewer independently passed Docker image builds and runtime smoke: native
 ![Native optional compiler workbench](images/server-compiler.png)
 
 ![Providers disabled when unconfigured](images/access-login-unconfigured.png)
+
+## Ledger response-race regression
+
+`python docs/verify-access-ledger.py` runs focused browser regressions against an isolated local admin demo. Configure `ACCESS_LEDGER_URL` and `ACCESS_LEDGER_PASSWORD_FILE` when using a different instance. It intercepts only audit GET responses, leaving the real frontend and password session in place. Requests are deliberately delayed to verify that owner A/API cannot overwrite owner B/MCP, old pagination cannot append or overwrite a new cursor, unapplied draft inputs do not alter pagination, rapid duplicate clicks issue one request, and overlapping page items render once. Both apps pass all four cases. Before the fixes, ES failed delayed reload ordering; Vault failed stale pagination and issued two duplicate pagination requests. No visual layout changed, so the access screenshot gallery remains current.

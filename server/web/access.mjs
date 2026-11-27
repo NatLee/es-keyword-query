@@ -622,6 +622,10 @@ async function connections() {
   const results = el("div");
   ledger.append(results);
   let cursor = null;
+  let ledgerGeneration = 0;
+  let appliedQuery = "";
+  let pagination = null;
+  let moreButton = null;
   const query = () =>
     new URLSearchParams({
       days: period.value,
@@ -632,10 +636,24 @@ async function connections() {
         : {}),
     }).toString();
   async function loadLedger() {
-    const [usage, events] = await Promise.all([
-      api("/api/access/usage?" + query()),
-      api("/api/access/events?" + query()),
-    ]);
+    const generation = ++ledgerGeneration;
+    const requestedQuery = query();
+    pagination = null;
+    cursor = null;
+    if (moreButton) moreButton.disabled = true;
+    let usage, events;
+    try {
+      [usage, events] = await Promise.all([
+        api("/api/access/usage?" + requestedQuery),
+        api("/api/access/events?" + requestedQuery),
+      ]);
+    } catch (error) {
+      if (generation === ledgerGeneration && version === renderVersion)
+        showError(error);
+      return;
+    }
+    if (generation !== ledgerGeneration || version !== renderVersion) return;
+    appliedQuery = requestedQuery;
     results.replaceChildren();
     results.append(
       el("p", "", `UTC · Last ${usage.days} days`),
@@ -690,8 +708,11 @@ async function connections() {
       header.append(el("th", "", label));
     head.append(header);
     const body = el("tbody");
+    const seen = new Set();
     const add = (items) => {
       for (const event of items) {
+        if (seen.has(event.id)) continue;
+        seen.add(event.id);
         const row = el("tr");
         for (const value of [
           utc(event.at),
@@ -711,16 +732,42 @@ async function connections() {
     cursor = events.next_cursor;
     if (cursor) {
       const more = button("Load earlier events", async () => {
-        const next = await api(
-          "/api/access/events?" +
-            query() +
-            "&cursor=" +
-            encodeURIComponent(cursor),
-        );
-        add(next.items);
-        cursor = next.next_cursor;
-        more.disabled = !cursor;
+        if (!cursor || pagination || generation !== ledgerGeneration) return;
+        const requestedCursor = cursor;
+        const requestedQuery = appliedQuery;
+        const page = Symbol("pagination");
+        pagination = page;
+        more.disabled = true;
+        try {
+          const next = await api(
+            "/api/access/events?" +
+              requestedQuery +
+              "&cursor=" +
+              encodeURIComponent(requestedCursor),
+          );
+          if (
+            generation !== ledgerGeneration ||
+            version !== renderVersion ||
+            pagination !== page
+          )
+            return;
+          add(next.items);
+          cursor = next.next_cursor;
+        } catch (error) {
+          if (
+            generation === ledgerGeneration &&
+            version === renderVersion &&
+            pagination === page
+          )
+            showError(error);
+        } finally {
+          if (pagination === page) {
+            pagination = null;
+            more.disabled = !cursor;
+          }
+        }
       });
+      moreButton = more;
       results.append(more);
     }
   }
