@@ -20,24 +20,26 @@ Defaultclosed,newmembers only,noemailauto-link,active+notdisabled everywhere. Ex
 ### Task1: Backend
 **Files:** Rust crates/access-kit/src/registration.rs and migrations/tests, host auth/access/migrations. Python web/access/registration.py,store.py,schema.sql,accounts.py,providers.py; tests/test_registration.py.
 **Interfaces:** Shared HTTP contract in spec, auth/state unchanged.
-- [ ] Write and run failing tests: oldmigration,defaultclosed,setuprequired,approval/open,memberonly,pendingnocookie.
-- [ ] Implement transactional policy,user,application,event andactivegates.
-- [ ] Add failing admin/Origin/reason/stale/cursor/audit/disabledtoggle tests; implementreview.
-- [ ] Add mockedproviderpolicyflip/concurrentsubject/state/linkage/lastidentity tests; implementexplicit signup.
-- [ ] Run full backend suites andfmt/clippy orRuff/Node/styleaudit; ledgerresults.
+- [x] Write and run failing tests: oldmigration,defaultclosed,setuprequired,approval/open,memberonly,pendingnocookie.
+- [x] Implement transactional policy,user,application,event andactivegates.
+- [x] Add failing admin/Origin/reason/stale/cursor/audit/disabledtoggle tests; implementreview.
+- [x] Add mockedproviderpolicyflip/concurrentsubject/state/linkage/lastidentity tests; implementexplicit signup.
+- [x] Run full backend suites andfmt/clippy orRuff/Node/styleaudit; ledgerresults.
 
 ### Task2: Frontend
 **Files:** React src/web/src/registration components/client/tests,App/Login/SettingsorUsers; ES server/web/access.mjs/css; Python web/static/access.html/mjs/css,registration.mjs,entry_pages.py.
 **Interfaces:** Policy/register/review/events endpoints in spec.
-- [ ] Write failingtests closedactions,confirmation,pending,activesession,adminpolicy/review/audit.
-- [ ] Implementthemed /register route andstatus notices; keepfirstlogin/safenext.
-- [ ] Add adminpolicy/queue/history withpagination,errors,busy/reasoncontrols.
-- [ ] Run completeUItests/build orJSsyntax/Node/stylechecks.
+- [x] Write failingtests closedactions,confirmation,pending,activesession,adminpolicy/review/audit.
+- [x] Implementthemed /register route andstatus notices; keepfirstlogin/safenext.
+- [x] Add adminpolicy/queue/history withpagination,errors,busy/reasoncontrols.
+- [x] Run completeUItests/build orJSsyntax/Node/stylechecks.
 
 ### Task3: Integration and delivery
 **Files:** README.md,docs/registration-verification.md,docs/images/registration-*.png,repeatablebrowserscript.
-- [ ] ActualChrome passwordapply/adminreview/login,reject/openflows;1440/390light/dark screenshots.
+- [x] ActualChrome passwordapply/adminreview/login,reject/openflows;1440/390light/dark screenshots.
 - [ ] FinalDockerbuild,oldDBmigration,independentsecurity/UIreview.
 - [ ] Record preciseevidence andSSO/GPU/CIlimitations; commitscopefiles.
 - [ ] Push/createPR,checkexacthead,merge/delete with existingauthorization.
 - [ ] Verify cleanmain=reviewedtree=remote; cleanupownedtestresources.
+
+Local evidence: shared core32 tests, host19 tests, fmt/clippy/build/snapshot checks passed. ActualChrome registration+firstlogin and64/256credential regression passed; tenfreshscreenshots. Sourceformatter preservedbehavior; JSsyntax/diffcheckpassed. FinalDocker/CI recorded inPR anddelivery report.

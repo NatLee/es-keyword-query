@@ -105,23 +105,42 @@ const providerErrors = {
   account_unavailable:
     "This account is unavailable. Contact the administrator.",
   provider_disabled: "This provider has not been configured.",
+  account_pending:
+    "Your account is awaiting administrator approval. Sign in after it has been approved.",
+  account_rejected:
+    "Your registration was rejected. Contact the administrator before trying again.",
+  registration_closed:
+    "Registration is closed. Ask the administrator for an account.",
+  setup_required:
+    "Create the first administrator before registering member accounts.",
+  last_login_method:
+    "Add another sign-in method before unlinking your last identity.",
 };
 function providerError() {
   const code = new URLSearchParams(location.search).get("access_error");
   if (code && Object.hasOwn(providerErrors, code))
     message(providerErrors[code]);
 }
-async function providerButtons(target) {
+async function providerButtons(target, registrationPolicy = null) {
   try {
     const data = await api("/api/access/providers");
     for (const p of data.items) {
+      if (
+        registrationPolicy &&
+        !registrationPolicy.providers.includes(p.provider)
+      )
+        continue;
       const card = el("article", "record");
-      const b = button(`${p.name} sign in`, () => {
-        const next = nextAuthorize();
-        location.assign(
-          p.login_start_url + (next ? `?next=${encodeURIComponent(next)}` : ""),
-        );
-      });
+      const b = button(
+        registrationPolicy ? `Continue with ${p.name}` : `${p.name} sign in`,
+        () => {
+          const next = nextAuthorize();
+          const query = new URLSearchParams();
+          if (registrationPolicy) query.set("intent", "register");
+          if (next) query.set("next", next);
+          location.assign(p.login_start_url + (query.size ? `?${query}` : ""));
+        },
+      );
       b.disabled = !p.enabled;
       card.append(
         b,
@@ -129,7 +148,9 @@ async function providerButtons(target) {
           "p",
           "",
           p.enabled
-            ? "Use an identity already linked to your account."
+            ? registrationPolicy
+              ? "Create a separate member account using this identity."
+              : "Use an identity already linked to your account."
             : `${p.name} is not configured. Local password sign-in remains available.`,
         ),
       );
@@ -137,7 +158,13 @@ async function providerButtons(target) {
     }
   } catch {
     target.append(
-      el("p", "", "Provider options are unavailable. Use your local account."),
+      el(
+        "p",
+        "",
+        registrationPolicy
+          ? "External registration options are unavailable. Try again or contact the administrator."
+          : "Provider options are unavailable. Use your local account.",
+      ),
     );
   }
 }
@@ -159,29 +186,55 @@ function firstLogin(auth) {
   intro.append(
     el("p", "kicker", "COMPILER FOUNDRY / FIRST ENTRY"),
     el("h1", "", "One account. Your foundry."),
-    el("p", "", "Turn keyword expressions into explicit logic. Create the first administrator to open your compiler workspace."),
+    el(
+      "p",
+      "",
+      "Turn keyword expressions into explicit logic. Create the first administrator to open your compiler workspace.",
+    ),
   );
   const steps = el("ol", "first-login-steps");
   for (const [title, detail] of [
-    ["Establish your identity", "Choose a local username and a password you will use to sign in."],
-    ["Open the workspace", "Your first account becomes the administrator and signs in immediately."],
-    ["Bring your team", "Add member accounts later from Connections. This page closes after setup."],
+    [
+      "Establish your identity",
+      "Choose a local username and a password you will use to sign in.",
+    ],
+    [
+      "Open the workspace",
+      "Your first account becomes the administrator and signs in immediately.",
+    ],
+    [
+      "Bring your team",
+      "Add member accounts later from Connections. This page closes after setup.",
+    ],
   ]) {
     const step = el("li");
     step.append(el("strong", "", title), el("p", "", detail));
     steps.append(step);
   }
-  intro.append(steps, el("p", "first-login-mark", "( identity & access ) → workspace"));
+  intro.append(
+    steps,
+    el("p", "first-login-mark", "( identity & access ) → workspace"),
+  );
   layout.append(intro);
   const node = el("section", "section login first-login-form");
   const header = el("header");
-  header.append(el("p", "kicker", "01 / INITIAL ADMINISTRATOR"), el("h2", "", "Create your first administrator"));
-  node.append(header, el("p", "", "This installation has no accounts yet. Your credentials stay with this server."));
+  header.append(
+    el("p", "kicker", "01 / INITIAL ADMINISTRATOR"),
+    el("h2", "", "Create your first administrator"),
+  );
+  node.append(
+    header,
+    el(
+      "p",
+      "",
+      "This installation has no accounts yet. Your credentials stay with this server.",
+    ),
+  );
   layout.append(node);
   main.append(layout);
   accountForm(node, auth);
 }
-function login() {
+async function login() {
   main.replaceChildren();
   const node = section("LOCAL ACCOUNT / SERVER EDITION", "Sign in");
   node.classList.add("login");
@@ -190,7 +243,178 @@ function login() {
   providers.append(el("h3", "", "Linked external identities"));
   node.append(providers);
   void providerButtons(providers);
+  const policy = await api("/api/auth/registration-policy");
+  const signup = el("div", "registration-entry");
+  if (policy.mode === "closed") {
+    signup.append(
+      el(
+        "p",
+        "",
+        "New accounts are created by the administrator. Registration is closed.",
+      ),
+    );
+  } else {
+    const link = el("a", "", "Create an account");
+    const next = nextAuthorize();
+    link.href = "/register" + (next ? `?next=${encodeURIComponent(next)}` : "");
+    signup.append(
+      link,
+      el(
+        "p",
+        "",
+        policy.mode === "approval"
+          ? "New accounts require administrator approval."
+          : "Registration is open. New accounts receive member access.",
+      ),
+    );
+  }
+  node.append(signup);
+  if (new URLSearchParams(location.search).get("registration") === "pending")
+    message(
+      "Your account is awaiting administrator approval. No workspace access has been granted yet. Sign in after it has been approved.",
+    );
   providerError();
+}
+async function registration() {
+  main.replaceChildren();
+  const policy = await api("/api/auth/registration-policy");
+  const layout = el("div", "first-login-layout registration-layout");
+  const intro = el("section", "first-login-intro");
+  intro.append(
+    el("p", "kicker", "COMPILER FOUNDRY / MEMBER ENTRY"),
+    el("h1", "", "Bring your own perspective."),
+    el(
+      "p",
+      "",
+      "Join the workspace to compile expressions, inspect their logic and connect your own tools.",
+    ),
+    el(
+      "p",
+      "registration-mode",
+      policy.mode === "approval"
+        ? "ADMINISTRATOR APPROVAL REQUIRED"
+        : policy.mode === "open"
+          ? "OPEN MEMBER REGISTRATION"
+          : "REGISTRATION CLOSED",
+    ),
+    el(
+      "p",
+      "",
+      policy.mode === "approval"
+        ? "Submit your account for review. An administrator must approve it before you can sign in or use the compiler."
+        : policy.mode === "open"
+          ? "Your new account receives member access. The first administrator setup remains separate."
+          : "Ask the administrator to create an account or reopen registration.",
+    ),
+    el("p", "first-login-mark", "( your identity ) → shared workspace"),
+  );
+  const node = el("section", "section login first-login-form");
+  const header = el("header");
+  header.append(
+    el("p", "kicker", "01 / MEMBER ACCOUNT"),
+    el(
+      "h2",
+      "",
+      policy.mode === "closed"
+        ? "Registration is closed"
+        : "Create your account",
+    ),
+  );
+  node.append(header);
+  layout.append(intro, node);
+  main.append(layout);
+  if (policy.mode !== "closed") {
+    if (policy.password_enabled) registrationForm(node);
+    if (policy.providers.length) {
+      const providers = el("div", "registration-providers");
+      providers.append(el("h3", "", "Or use an external identity"));
+      node.append(providers);
+      await providerButtons(providers, policy);
+    }
+    if (!policy.password_enabled && !policy.providers.length)
+      node.append(
+        el(
+          "p",
+          "notice",
+          "No registration methods are available. Contact the administrator.",
+        ),
+      );
+  }
+  const link = el("a", "", "Already have an account? Sign in");
+  const next = nextAuthorize();
+  link.href = "/login" + (next ? `?next=${encodeURIComponent(next)}` : "");
+  node.append(link);
+  providerError();
+}
+function registrationForm(node) {
+  const form = el("form", "stack");
+  const username = field("Username"),
+    display = field("Display name"),
+    password = field("Password", "password"),
+    confirm = field("Confirm password", "password");
+  username.input.required = true;
+  username.input.minLength = 3;
+  username.input.maxLength = 64;
+  username.input.pattern = "[A-Za-z0-9_.\\-]{3,64}";
+  username.input.autocomplete = "username";
+  username.input.spellcheck = false;
+  username.wrap.append(
+    el("small", "", "3–64 letters, numbers, underscores, dots or hyphens."),
+  );
+  display.input.maxLength = 100;
+  display.input.autocomplete = "nickname";
+  display.wrap.append(el("small", "", "Optional. Defaults to your username."));
+  for (const input of [password.input, confirm.input]) {
+    input.required = true;
+    input.minLength = 12;
+    input.maxLength = 256;
+    input.autocomplete = "new-password";
+  }
+  password.wrap.append(el("small", "", "Use 12–256 characters."));
+  const submit = el("button", "primary", "Create account");
+  submit.type = "submit";
+  form.append(username.wrap, display.wrap, password.wrap, confirm.wrap, submit);
+  let busy = false;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    if (password.input.value !== confirm.input.value) {
+      showError(
+        new Error("Passwords do not match. Enter the same password twice."),
+      );
+      confirm.input.focus();
+      return;
+    }
+    busy = true;
+    submit.disabled = true;
+    submit.textContent = "Creating account…";
+    form.setAttribute("aria-busy", "true");
+    try {
+      const result = await api("/api/auth/register", "POST", {
+        username: username.input.value.trim(),
+        display_name: display.input.value.trim() || undefined,
+        password: password.input.value,
+      });
+      password.input.value = confirm.input.value = "";
+      if (result.status === "pending")
+        location.assign("/login?registration=pending");
+      else {
+        const auth = await api("/api/auth/state");
+        if (!auth.user)
+          throw new Error("Account created. Sign in to continue.");
+        location.assign(nextAuthorize() ?? "/");
+      }
+    } catch (error) {
+      password.input.value = confirm.input.value = "";
+      showError(error);
+    } finally {
+      busy = false;
+      submit.disabled = false;
+      submit.textContent = "Create account";
+      form.setAttribute("aria-busy", "false");
+    }
+  });
+  node.append(form);
 }
 function accountForm(node, setup) {
   const form = el("form", "stack");
@@ -202,19 +426,29 @@ function accountForm(node, setup) {
   user.input.required = true;
   user.input.autocomplete = "username";
   user.input.minLength = 3;
-  user.input.maxLength = 32;
-  user.input.pattern = "[A-Za-z0-9_.\\-]{3,32}";
+  user.input.maxLength = setup ? 32 : 64;
+  user.input.pattern = setup
+    ? "[A-Za-z0-9_.\\-]{3,32}"
+    : "[A-Za-z0-9_.\\-]{3,64}";
   user.input.spellcheck = false;
   password.input.required = true;
   password.input.minLength = 8;
-  password.input.maxLength = 200;
+  password.input.maxLength = setup ? 200 : 256;
   password.input.autocomplete = setup ? "new-password" : "current-password";
   form.append(user.wrap);
   if (setup) {
-    user.wrap.append(el("small", "", "3–32 letters, numbers, underscores, dots or hyphens."));
+    user.wrap.append(
+      el("small", "", "3–32 letters, numbers, underscores, dots or hyphens."),
+    );
     display.input.maxLength = 40;
     display.input.autocomplete = "nickname";
-    display.wrap.append(el("small", "", "Optional. Up to 40 characters; defaults to your username."));
+    display.wrap.append(
+      el(
+        "small",
+        "",
+        "Optional. Up to 40 characters; defaults to your username.",
+      ),
+    );
     form.append(display.wrap);
   }
   form.append(password.wrap);
@@ -229,15 +463,29 @@ function accountForm(node, setup) {
       setupToken.input.required = true;
       setupToken.input.autocomplete = "off";
       setupToken.input.maxLength = 512;
-      setupToken.wrap.append(el("small", "", "Use the code configured by your deployment operator. It is used only for this first account."));
+      setupToken.wrap.append(
+        el(
+          "small",
+          "",
+          "Use the code configured by your deployment operator. It is used only for this first account.",
+        ),
+      );
       form.append(setupToken.wrap);
     } else if (setup.setup_token_required) {
-      const notice = el("p", "notice", "Remote setup is locked. Open this service on its loopback interface, use CLI bootstrap, or ask the deployment operator to configure ACCESS_SETUP_TOKEN.");
+      const notice = el(
+        "p",
+        "notice",
+        "Remote setup is locked. Open this service on its loopback interface, use CLI bootstrap, or ask the deployment operator to configure ACCESS_SETUP_TOKEN.",
+      );
       notice.role = "status";
       form.append(notice);
     }
   }
-  const submit = el("button", "primary", setup ? "Create administrator" : "Sign in");
+  const submit = el(
+    "button",
+    "primary",
+    setup ? "Create administrator" : "Sign in",
+  );
   submit.type = "submit";
   const locked = setup?.setup_token_required && !setup.setup_token_configured;
   submit.disabled = Boolean(locked);
@@ -247,7 +495,9 @@ function accountForm(node, setup) {
     event.preventDefault();
     if (busy || locked) return;
     if (setup && password.input.value !== confirm.input.value) {
-      showError(new Error("Passwords do not match. Enter the same password twice."));
+      showError(
+        new Error("Passwords do not match. Enter the same password twice."),
+      );
       confirm.input.focus();
       return;
     }
@@ -257,21 +507,31 @@ function accountForm(node, setup) {
     submit.textContent = setup ? "Creating administrator…" : "Signing in…";
     document.querySelector("#page-error")?.remove();
     try {
-      currentUser = await api(setup ? "/api/auth/setup" : "/api/auth/login", "POST", {
-        username: user.input.value.trim(),
-        password: password.input.value,
-        ...(setup ? {
-          display_name: display.input.value.trim() || undefined,
-          ...(setup.setup_token_required ? { setup_token: setupToken.input.value } : {}),
-        } : {}),
-      });
+      currentUser = await api(
+        setup ? "/api/auth/setup" : "/api/auth/login",
+        "POST",
+        {
+          username: user.input.value.trim(),
+          password: password.input.value,
+          ...(setup
+            ? {
+                display_name: display.input.value.trim() || undefined,
+                ...(setup.setup_token_required
+                  ? { setup_token: setupToken.input.value }
+                  : {}),
+              }
+            : {}),
+        },
+      );
       password.input.value = confirm.input.value = setupToken.input.value = "";
       location.assign(nextAuthorize() ?? "/");
     } catch (error) {
       password.input.value = confirm.input.value = setupToken.input.value = "";
       if (setup && error.status === 409) {
         const next = nextAuthorize();
-        location.replace("/login" + (next ? `?next=${encodeURIComponent(next)}` : ""));
+        location.replace(
+          "/login" + (next ? `?next=${encodeURIComponent(next)}` : ""),
+        );
         return;
       }
       showError(error);
@@ -841,10 +1101,279 @@ async function connections() {
   await loadLedger();
   if (version !== renderVersion) return;
   if (currentUser.role === "admin") {
+    await registrationAdmin(version);
+    if (version !== renderVersion) return;
     await clientRegistry();
     if (version !== renderVersion) return;
     await members();
   }
+}
+async function registrationAdmin(version) {
+  const target = section("05 / MEMBER ENTRY", "Registration policy");
+  target.append(
+    el(
+      "p",
+      "",
+      "Choose how new members join. Existing accounts keep their current access. The first account is always created through the administrator setup.",
+    ),
+  );
+  const policy = await api("/api/auth/registration-policy");
+  if (version !== renderVersion) return;
+  const form = el("form", "stack");
+  const choices = el("fieldset", "registration-policy");
+  choices.append(el("legend", "", "Who can register?"));
+  for (const [value, title, detail] of [
+    [
+      "closed",
+      "Closed",
+      "Only administrators can create accounts. This is the default.",
+    ],
+    [
+      "approval",
+      "Administrator approval",
+      "New accounts wait for a review before they can sign in.",
+    ],
+    ["open", "Open", "New accounts receive member access immediately."],
+  ]) {
+    const label = el("label", "policy-choice");
+    const input = el("input");
+    input.type = "radio";
+    input.name = "registration-mode";
+    input.value = value;
+    input.checked = value === policy.mode;
+    input.setAttribute("aria-label", title);
+    const text = el("span");
+    text.append(el("strong", "", title), el("small", "", detail));
+    label.append(input, text);
+    choices.append(label);
+  }
+  const save = el("button", "primary", "Save registration policy");
+  save.type = "submit";
+  form.append(choices, save);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (save.disabled) return;
+    save.disabled = true;
+    try {
+      await api("/api/auth/registration-policy", "PATCH", {
+        mode: new FormData(form).get("registration-mode"),
+      });
+      await connections();
+      message("Registration policy saved.");
+    } catch (error) {
+      showError(error);
+    } finally {
+      save.disabled = false;
+    }
+  });
+  target.append(form);
+  const queue = section("06 / ACCOUNT REVIEW", "Registration requests");
+  queue.append(
+    el(
+      "p",
+      "",
+      "Approve verified members or reject a request with a reason. Pending and rejected accounts cannot sign in.",
+    ),
+  );
+  const filter = el("label", "field", "Request status");
+  const status = el("select");
+  status.setAttribute("aria-label", "Request status");
+  for (const [value, label] of [
+    ["pending", "Pending review"],
+    ["active", "Active"],
+    ["rejected", "Rejected"],
+  ]) {
+    const option = el("option", "", label);
+    option.value = value;
+    status.append(option);
+  }
+  filter.append(status);
+  const records = el("div", "registration-records");
+  queue.append(filter, records);
+  let cursor = null,
+    generation = 0;
+  const more = button("Load earlier requests", () => loadRequests(false));
+  more.hidden = true;
+  queue.append(more);
+  async function loadRequests(reset = true) {
+    const requestGeneration = reset ? ++generation : generation;
+    const selected = status.value;
+    if (reset) {
+      cursor = null;
+      records.replaceChildren();
+    }
+    more.disabled = true;
+    try {
+      const query = new URLSearchParams({ status: selected, limit: "50" });
+      if (cursor) query.set("before", cursor);
+      const data = await api("/api/auth/registrations?" + query);
+      if (requestGeneration !== generation || version !== renderVersion) return;
+      if (reset && !data.items.length)
+        records.append(
+          el(
+            "p",
+            "empty-state",
+            selected === "pending"
+              ? "No accounts are waiting for review."
+              : "No registrations with this status.",
+          ),
+        );
+      for (const request of data.items)
+        records.append(registrationRecord(request));
+      cursor = data.next_cursor;
+      more.hidden = !cursor;
+    } catch (error) {
+      if (requestGeneration === generation) showError(error);
+    } finally {
+      if (requestGeneration === generation) more.disabled = false;
+    }
+  }
+  status.addEventListener("change", () => void loadRequests());
+  await loadRequests();
+  if (version !== renderVersion) return;
+  const history = section("07 / REGISTRATION AUDIT", "Registration history");
+  history.append(
+    el("p", "", "Policy changes and account decisions, recorded in UTC."),
+  );
+  const events = el("div");
+  history.append(events);
+  let eventCursor = null;
+  const earlier = button("Load earlier registration history", loadEvents);
+  earlier.hidden = true;
+  history.append(earlier);
+  async function loadEvents() {
+    earlier.disabled = true;
+    try {
+      const data = await api(
+        "/api/auth/registration-events?limit=50" +
+          (eventCursor ? "&before=" + encodeURIComponent(eventCursor) : ""),
+      );
+      if (version !== renderVersion) return;
+      if (!eventCursor && !data.items.length)
+        events.append(el("p", "empty-state", "No registration events yet."));
+      const actions = {
+        registered: "Account registered",
+        approved: "Account approved",
+        rejected: "Account rejected",
+        policy_changed: "Policy changed",
+      };
+      for (const event of data.items) {
+        const row = el("article", "record registration-event");
+        row.append(
+          el("h3", "", actions[event.action] ?? event.action),
+          el(
+            "p",
+            "",
+            `${utc(event.created_at)} · ${event.actor_username ?? "Public registration"}`,
+          ),
+        );
+        if (event.registration_id)
+          row.append(el("p", "", `Request #${event.registration_id}`));
+        if (event.mode)
+          row.append(el("p", "", `Registration mode: ${event.mode}`));
+        if (event.reason) row.append(el("p", "", event.reason));
+        events.append(row);
+      }
+      eventCursor = data.next_cursor;
+      earlier.hidden = !eventCursor;
+    } catch (error) {
+      showError(error);
+    } finally {
+      earlier.disabled = false;
+    }
+  }
+  await loadEvents();
+}
+function registrationRecord(request) {
+  const row = el("article", "record registration-record");
+  row.append(
+    el(
+      "p",
+      "kicker",
+      `REQUEST ${String(request.id).padStart(2, "0")} / ${request.provider.toUpperCase()}`,
+    ),
+    el("h3", "", `${request.display_name} (${request.username})`),
+    el(
+      "p",
+      "",
+      `${request.status} · Submitted (UTC): ${utc(request.created_at)}`,
+    ),
+  );
+  if (request.reviewed_at)
+    row.append(
+      el(
+        "p",
+        "",
+        `Reviewed (UTC): ${utc(request.reviewed_at)} · Administrator #${request.reviewed_by}`,
+      ),
+    );
+  if (request.rejection_reason)
+    row.append(el("p", "", request.rejection_reason));
+  if (request.status !== "pending") return row;
+  const form = el("form", "review-form");
+  const reason = field("Rejection reason", "textarea");
+  reason.input.maxLength = 500;
+  reason.input.required = true;
+  reason.wrap.append(
+    el("small", "", "Required when rejecting. Up to 500 characters."),
+  );
+  let busy = false;
+  const approve = button("Approve account", () => review("approve"), true);
+  const reject = el("button", "", "Reject account");
+  reject.type = "submit";
+  form.append(reason.wrap, reject);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void review("reject");
+  });
+  async function review(decision) {
+    if (busy) return;
+    if (decision === "reject" && !reason.input.value.trim()) {
+      reason.input.focus();
+      showError(
+        new Error("Enter a rejection reason before rejecting this account."),
+      );
+      return;
+    }
+    busy = true;
+    approve.disabled = reject.disabled = true;
+    form.setAttribute("aria-busy", "true");
+    try {
+      await api(
+        `/api/auth/registrations/${encodeURIComponent(request.id)}/review`,
+        "POST",
+        {
+          decision,
+          ...(decision === "reject"
+            ? { reason: reason.input.value.trim() }
+            : {}),
+        },
+      );
+      await connections();
+      message(
+        decision === "approve"
+          ? "Account approved. The member can now sign in."
+          : "Account rejected. The reason has been recorded.",
+      );
+    } catch (error) {
+      if (error.status === 409) {
+        try {
+          await connections();
+          message(
+            "This request was already reviewed. The queue has been refreshed.",
+          );
+        } catch (refreshError) {
+          showError(refreshError);
+        }
+      } else showError(error);
+    } finally {
+      busy = false;
+      approve.disabled = reject.disabled = false;
+      form.setAttribute("aria-busy", "false");
+    }
+  }
+  row.append(approve, form);
+  return row;
 }
 function showSecret(raw) {
   document.querySelector(".secret")?.remove();
@@ -885,7 +1414,7 @@ function showSecret(raw) {
 }
 async function clientRegistry() {
   const target = section(
-    "05 / OAUTH CLIENT REGISTRY",
+    "08 / OAUTH CLIENT REGISTRY",
     "Registered applications",
   );
   const form = el("form", "stack");
@@ -935,7 +1464,7 @@ async function clientRegistry() {
   }
 }
 async function members() {
-  const target = section("06 / LOCAL ACCOUNTS", "Compiler accounts");
+  const target = section("09 / LOCAL ACCOUNTS", "Compiler accounts");
   const form = el("form", "stack");
   const name = field("New username"),
     display = field("New display name"),
@@ -971,7 +1500,11 @@ async function members() {
     const row = el("article", "record");
     row.append(
       el("h3", "", `${user.display_name} (${user.username})`),
-      el("p", "", `${user.role} · ${user.disabled ? "Disabled" : "Active"}`),
+      el(
+        "p",
+        "",
+        `${user.role} · ${user.account_status === "pending" ? "Pending approval" : user.account_status === "rejected" ? "Registration rejected" : user.disabled ? "Disabled" : "Active"}`,
+      ),
     );
     const change = button(
       user.disabled ? "Enable " + user.username : "Disable " + user.username,
@@ -994,17 +1527,31 @@ async function routeAuth(auth) {
   const continuation = next ? `?next=${encodeURIComponent(next)}` : "";
   if (!currentUser) {
     const code = new URLSearchParams(location.search).get("access_error");
-    const providerNotice = !auth.setup_required && code && Object.hasOwn(providerErrors, code)
-      ? `${continuation ? "&" : "?"}access_error=${encodeURIComponent(code)}`
-      : "";
-    const target = (auth.setup_required ? "/first-login" : "/login") + continuation + providerNotice;
+    const providerNotice =
+      !auth.setup_required && code && Object.hasOwn(providerErrors, code)
+        ? `${continuation ? "&" : "?"}access_error=${encodeURIComponent(code)}`
+        : "";
+    const pendingNotice =
+      !auth.setup_required &&
+      new URLSearchParams(location.search).get("registration") === "pending"
+        ? `${continuation || providerNotice ? "&" : "?"}registration=pending`
+        : "";
+    const entry = auth.setup_required
+      ? "/first-login"
+      : location.pathname === "/register"
+        ? "/register"
+        : "/login";
+    const target = entry + continuation + providerNotice + pendingNotice;
     if (location.pathname + location.search !== target) {
       location.replace(target);
       return;
     }
     if (auth.setup_required) firstLogin(auth);
-    else login();
-  } else if (["/login", "/first-login"].includes(location.pathname)) {
+    else if (entry === "/register") await registration();
+    else await login();
+  } else if (
+    ["/login", "/first-login", "/register"].includes(location.pathname)
+  ) {
     location.replace(next ?? "/");
   } else if (location.pathname === "/consent") await consent();
   else if (location.pathname === "/connections") await connections();
