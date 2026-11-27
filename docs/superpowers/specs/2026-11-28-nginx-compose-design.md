@@ -1,22 +1,33 @@
-# Nginx and unified Docker Compose deployment
+# nginx and unified Docker Compose deployment
 
-User request2026-11-28: use nginx for frontend/backend proxying, organized into one Docker Compose YAML per project. This extends the ongoing registration delivery; previously approved account policies/first-login remain.
+The user requested nginx in front of the frontend and backend, managed in one Compose YAML per repository. This extends the controlled-registration delivery; account policy and first-login behavior remain unchanged.
 
-## Design decision
-One public nginx service serves built frontend assets and proxies backend routes; the existing nonroot backend is internal-only. This avoids a second static server while keeping deployments in one command. Existing standalone Docker image remains available for compatibility/CI. All existing SQLite volume keys and normal host ports remain unchanged. No product-domain/auth behavior changes solely for proxying.
+## Architecture
 
-## Contract
-- One root docker-compose.yml per repository. Only nginx publishes the application port; backend exposes internally. Feedback mailpit remains optional profile and its local testmail port.
-- React nginx serves dist with SPA deep-link fallback, assets return404 ifmissing. Proxy /api/ /oauth/ /.well-known/ and exact/prefix/mcp without stripping paths. Preserve Feedback /f/ and CDP /collect,/t.js. ES serves server/web assets similarly. Sentiment serves /static/ assets directly but forwards server-rendered entry routes so empty-install bootstrap remains authoritative.
-- Proxy Host=$http_host preserves port; keepOrigin/Cookie/Authorization andresponsecookies. Overwrite X-Forwarded-For/X-Real-IP from connectionpeer; do not accept caller-provided forwarded authority/proto. Configure canonical ACCESS_PUBLIC_URL matchingthebrowser; existinglegacy PUBLIC_URL variables remaincompatible and conflictingoverrides stillfail existingvalidation.
-- HTTP1.1; proxybufferingoff, requestbufferingoff and >=300s readtimeout forMCP/streaming; preservebackend401challenges anddiscoveryURLs.
-- Logs use URI withoutquerystring soOAuthcodes/state are notlogged. Do notlogcredentials orheaders. /healthz identifiesnginx only; integration health verifiesbackendthroughproxy too.
-- Nonloopback ES/Sentiment firstadminsetup stillneedsACCESS_SETUP_TOKEN (32–512characters); nginx doesnotfakeloopback ortrustXFF forbootstrap.
-- Sentiment hasonecompose: defaultapi+nginx; optional inference profile forGPUmodel+worker. Worker token remainsrequiredatworkerstartup; defaultwebalone mustnotrequireGPUorworkercredentials. Preserveexistingmodel/data mounts andaccess-data volume. Removeobsoletecompose.web.yml andupdatecommands.
+nginx is the only public application service. It serves built frontend assets and proxies API routes to the existing nonroot backend on the internal Compose network. Existing standalone images remain supported. Existing host ports and named SQLite volumes are preserved.
 
-## Verification
-DockercomposeconfigJSON confirmsonepublicapplicationservice andvolumeconsistency; nginx-t checksconfig. Buildbothservices andstartowneddisposablecomposeproject. Realbrowser/HTTPthroughnginx verifiesassets/deeplinks/firstlogin/closed-approval-openregistration/review/login/cookies,canonicalOrigin rejection/OAuthmetadata/MCPunauthorizedchallenge. SpecialCDPtracker/collection andfeedbackpublicformsmoketests. Verifyquerystringsnotinaccesslogs, backendportsnotpublished. Existingfullbackend/frontendtestresultsremainvalidforunchangedproductcode; rerunaffectedchecksifproxyrevealsbugs. GPUmodel execution requiresNVIDIA/data andisnotclaimedonthisMac. Documentexactevidence; PRmerge/deleteunderexistingauthorization.
+A second static-server container adds no useful boundary, so nginx serves the assets directly. Sentiment keeps its server-owned entry-page redirects and uses an optional `inference` profile for the legacy model and worker.
 
-## Official references
-https://nginx.org/en/docs/http/ngx_http_proxy_module.html
-https://docs.docker.com/compose/how-tos/profiles/
+## Routing and security contract
+
+- One root `docker-compose.yml`; only nginx publishes the application port. Feedback's optional mail-test UI retains its loopback-only port.
+- React uses SPA deep-link fallback and explicit missing-asset 404 responses. Proxy `/api`, `/oauth`, `/.well-known` and `/mcp` without rewriting paths. Preserve Feedback's public forms and CDP's collection/tracker routes.
+- ES serves the compiler workbench; `.mjs` files require a JavaScript MIME type. Sentiment serves `/static` directly and proxies server-owned entry pages and archive allowlisting.
+- Preserve Host including port, Origin, Cookie and Authorization. Replace untrusted forwarding headers with connection information. Canonical public URLs must match the browser origin; legacy URL variables remain compatible and explicit conflicts remain visible to existing validation.
+- Preserve static security headers without duplicating upstream response headers. Docker DNS re-resolution follows backend container IP changes.
+- Use HTTP/1.1, disable proxy/request buffering, and allow 300-second reads/writes for streaming. Apply a bounded connect timeout.
+- Log paths without query strings or credentials. Disable server-context error logging because nginx can append full request queries even at critical severity; retain main-context startup diagnostics and safe status logs.
+- ES and Sentiment browser setup through nginx still requires a deployment setup token. Forwarded loopback headers must not bypass this guard.
+- Sentiment defaults to web plus nginx, without GPU or worker credentials. The optional inference worker validates its secret at startup and has an explicit build dependency on the model image. Preserve mounts and `access-data`; remove the obsolete second Compose YAML.
+
+## Verification and delivery
+
+Validate Compose configuration, original volumes, one public application service, nginx syntax, image builds and isolated runtime flows. Through nginx, test first-login, closed/approval/open registration, review, cookies, Origin rejection, canonical OAuth metadata, bearer API and official MCP transport. Test missing assets, forwarding headers, query redaction during upstream failures and changed backend IP recovery. Preserve special public routes.
+
+Record real browser/HTTP evidence in `docs/nginx-deployment.md`; do not claim live Google/GitHub or NVIDIA execution from local fixture tests. Update README architecture and commands. After independent review and applicable checks, create PRs, merge accepted heads and delete task branches under the user's existing authorization. Preserve repository visibility and remove only owned test resources.
+
+## References
+
+- https://nginx.org/en/docs/http/ngx_http_proxy_module.html
+- https://docs.docker.com/compose/how-tos/profiles/
+- https://docs.docker.com/reference/compose-file/services/

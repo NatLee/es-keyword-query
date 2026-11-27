@@ -209,6 +209,26 @@ fixes, and validation scope.
 
 [MIT](LICENSE) © 2022 Nat Lee
 
+## Run the workbench with nginx
+
+```sh
+cp .env.example .env
+# Set ACCESS_SETUP_TOKEN in .env using: openssl rand -hex 32
+docker compose up -d --build
+```
+
+Open <http://127.0.0.1:8670>. The first-login form requires the deployment setup code to create the first administrator. After setup, remove the token from `.env` and recreate `api`; existing accounts and sessions remain in the SQLite volume.
+
+```mermaid
+flowchart LR
+  Browser[Browser / API / MCP] -->|:8670| Nginx[nginx]
+  Nginx --> Static[Compiler workbench assets]
+  Nginx --> API[Internal Rust API]
+  API --> SQLite[(SQLite volume)]
+```
+
+Only nginx publishes a host port. Keep `ACCESS_PUBLIC_URL` identical to the browser origin, including hostname and port. See [nginx deployment and verification](docs/nginx-deployment.md) for routes, proxy headers, streaming, logs and upgrades. The existing standalone server image and Rust library remain available.
+
 ## Account connections, API and MCP
 
 The library remains independent: its Cargo manifest and runtime dependency graph are unchanged. The optional server is a separate Rust 1.88+ package with SQLite accounts, password sessions and the native compiler workbench.
