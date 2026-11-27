@@ -3,6 +3,38 @@
 use std::{env, path::PathBuf};
 
 use anyhow::{Context, Result};
+use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
+
+/// Deployment credential. Debug output deliberately never includes the secret.
+#[derive(Clone)]
+pub struct SetupToken(String);
+
+impl std::fmt::Debug for SetupToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[redacted]")
+    }
+}
+
+impl SetupToken {
+    pub(crate) fn matches(&self, candidate: &str) -> bool {
+        let expected = Sha256::digest(self.0.as_bytes());
+        let actual = Sha256::digest(candidate.as_bytes());
+        bool::from(expected.ct_eq(&actual))
+    }
+
+    fn from_env() -> Result<Option<Self>> {
+        match env::var("ACCESS_SETUP_TOKEN") {
+            Err(env::VarError::NotPresent) => Ok(None),
+            Ok(token)
+                if (32..=512).contains(&token.chars().count()) && !token.trim().is_empty() =>
+            {
+                Ok(Some(Self(token)))
+            }
+            _ => anyhow::bail!("ACCESS_SETUP_TOKEN must contain 32 to 512 characters"),
+        }
+    }
+}
 
 pub const DEFAULT_BIND: &str = "127.0.0.1:8670";
 
@@ -15,6 +47,8 @@ pub struct Config {
     pub public_origin: Option<String>,
     /// 登入 cookie 要不要加 `Secure`。沒設定時看 `ES_SERVER_PUBLIC_URL` 是不是 https。
     pub cookie_secure: bool,
+    /// Optional credential allowing first-account creation from a non-loopback peer.
+    pub setup_token: Option<SetupToken>,
     /// `~` 後面沒寫數字時的距離。
     pub default_slop: u32,
 }
@@ -40,6 +74,7 @@ impl Config {
             ),
             public_origin: public_url.as_deref().and_then(origin_of),
             cookie_secure,
+            setup_token: SetupToken::from_env()?,
             default_slop: parse_var("ES_SERVER_DEFAULT_SLOP", 20)?,
         })
     }

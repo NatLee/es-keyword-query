@@ -382,6 +382,7 @@ mod tests {
             static_dir: "x".into(),
             public_origin: public_url.and_then(origin_of),
             cookie_secure: false,
+            setup_token: None,
             default_slop: 20,
         }
     }

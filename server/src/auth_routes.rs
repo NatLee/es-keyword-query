@@ -30,10 +30,24 @@ async fn user_count(state: &AppState) -> AppResult<i64> {
 }
 
 /// 前端一開始問的：要不要先建立管理員、現在是誰登入。
-pub async fn state(State(state): State<AppState>, headers: HeaderMap) -> AppResult<Json<Value>> {
+type Peer = Option<axum::Extension<axum::extract::ConnectInfo<std::net::SocketAddr>>>;
+
+fn is_loopback(peer: &Peer) -> bool {
+    peer.as_ref()
+        .is_some_and(|info| info.0 .0.ip().is_loopback())
+}
+
+pub async fn state(
+    State(state): State<AppState>,
+    peer: Peer,
+    headers: HeaderMap,
+) -> AppResult<Json<Value>> {
     let user = auth::optional_user(&state.db, &headers).await?;
+    let setup_required = user_count(&state).await? == 0;
     Ok(Json(json!({
-        "setup_required": user_count(&state).await? == 0,
+        "setup_required": setup_required,
+        "setup_token_required": setup_required && !is_loopback(&peer),
+        "setup_token_configured": setup_required && state.config.setup_token.is_some(),
         "user": user,
     })))
 }
@@ -46,6 +60,7 @@ async fn signed_in(state: &AppState, user: CurrentUser) -> AppResult<Response> {
 
 #[derive(Deserialize)]
 pub struct SetupBody {
+    setup_token: Option<String>,
     username: String,
     display_name: Option<String>,
     password: String,
@@ -54,15 +69,21 @@ pub struct SetupBody {
 /// 第一次使用：建立管理員。已經有帳號之後這個 API 就關掉。
 pub async fn setup(
     State(state): State<AppState>,
-    peer: Option<axum::Extension<axum::extract::ConnectInfo<std::net::SocketAddr>>>,
+    peer: Peer,
     Json(body): Json<SetupBody>,
 ) -> AppResult<Response> {
     if user_count(&state).await? > 0 {
         return Err(AppError::conflict("已經設定過了，請直接登入"));
     }
-    if !peer.is_some_and(|info| info.0 .0.ip().is_loopback()) {
+    if !is_loopback(&peer)
+        && !state.config.setup_token.as_ref().is_some_and(|expected| {
+            body.setup_token
+                .as_deref()
+                .is_some_and(|candidate| expected.matches(candidate))
+        })
+    {
         return Err(AppError::forbidden(
-            "首次管理員設定只接受本機 loopback 請求",
+            "首次管理員設定需要本機 loopback 連線，或有效的部署設定代碼",
         ));
     }
     let username = body.username.trim().to_lowercase();
