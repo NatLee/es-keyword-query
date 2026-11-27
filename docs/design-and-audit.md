@@ -3,14 +3,14 @@
 # Compiler field reference and parser audit
 
 The project is a Rust library, so its public-facing surface is a developer
-reference. The new `docs/index.html` uses a dark drafting-table palette, mint
-operator accents, editorial serif headings, and a paired input/output area.
-A numbered normalization → parsing → compilation rail explains the actual
-pipeline. Three example selectors and a light/dark control work offline. The
+reference. The current `docs/index.html` is the Compiler Foundry: cobalt blueprint
+paper, a black/cyan theme, a source → normalization → parsing → compilation rail,
+and eight Rust-generated specimens. Selectable clauses and a release sheet make
+the compiled output auditable. The
 page explicitly identifies the examples as fixed reference material, not a
 JavaScript compiler. No frontend framework or dependency was added.
 
-`docs/images/cover.svg` is the editable source for the repository cover.
+The repository cover now uses the actual Compiler Foundry application capture.
 `reference-desktop.png` and `reference-mobile.png` are actual Chromium captures
 of the reference, produced by `docs/capture-reference.py`. The page works at
 1440px and 390px widths with no horizontal overflow. Example switching and the

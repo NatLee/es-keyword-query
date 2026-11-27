@@ -1,4 +1,4 @@
-![es-keyword-query compiler pipeline](docs/images/cover.svg)
+![Compiler Foundry: a Rust-verified blueprint of query compilation](docs/images/reference-light.png)
 
 # es-keyword-query
 
@@ -18,9 +18,13 @@ becomes
 ("apple" OR ("apple pie"~20)) AND "store" NOT "rumor"
 ```
 
-[Open the interactive compiler atlas](docs/index.html) · [API docs: `cargo doc --open`](#development)
+[Open the Compiler Foundry](docs/index.html) · [API docs: `cargo doc --open`](#development)
 
-![Compiler atlas with a Rust-generated grouping diagram](docs/images/reference-desktop.png)
+<details><summary>Dark drafting canvas</summary>
+
+![Compiler Foundry with a Rust-generated grouping diagram](docs/images/reference-desktop.png)
+
+</details>
 
 ## Syntax
 
@@ -112,11 +116,14 @@ on the target engine's fields and analyzers; proximity slop is not a character
 count. Raw mode intentionally passes Lucene syntax through and is not an
 escaping boundary for untrusted input.
 
-The [compiler atlas](docs/index.html) opens directly in a browser, works offline,
+The [Compiler Foundry](docs/index.html) opens directly in a browser, works offline,
 and explores **eight finite Rust-generated specimens**. Select a clause in the
-branch diagram, follow normalization → structure → compilation, switch precise/raw
+branch diagram, follow source → normalization → structure → compilation, switch precise/raw
 output, and compose a grouped filter. Copy the compiled query or export its JSON
-inspection. It does not compile arbitrary input in the browser.
+inspection. It does not compile arbitrary input in the browser. The cobalt blueprint and black/cyan
+drafting surfaces expose the production stages, active clause and exact release artifact.
+Arrow keys, Home and End move between stage tabs. Barlow Condensed is bundled
+locally with its [license and provenance](docs/fonts/README.md); no font CDN is required.
 
 For arbitrary expressions, use the local CLI:
 
@@ -149,7 +156,7 @@ cargo run --example build_atlas -- --check
 ```
 
 The library retains one runtime dependency. `serde_json` is used only by development
-examples. The [SVG cover](docs/images/cover.svg) is editable. [Visual insights notes](docs/visual-insights.md)
+examples. The README cover is an actual application capture. [Visual insights notes](docs/visual-insights.md)
 cover the design, reading order, tests and browser verification.
 
 ```

@@ -1,8 +1,8 @@
-# Compiler atlas implementation plan
+# Compiler Foundry
 
 Goal: make the Rust compiler's structure explorable without pretending a static page runs arbitrary Rust code.
 
-The atlas uses a deep ocean drafting canvas, fine coordinate lines, mint and coral clauses, a tree inspection surface and a sequential compiler rail. Visitors choose finite verified specimens, switch precise/raw output, inspect a clause, and compose a grouped filter. A CLI example compiles arbitrary local input. The page explicitly labels its finite dataset and runs offline.
+The foundry uses cobalt blueprint paper or a true black/cyan drafting canvas, a technical specimen library, a selectable circuit tree and a four-step source → normalize → parse → compile production line. A locally bundled Barlow Condensed headline gives the page its engineering identity. Visitors choose finite verified specimens, switch precise/raw output, inspect a clause, and compose a grouped filter. A CLI example compiles arbitrary local input. The page explicitly labels its finite dataset and runs offline.
 
 Architecture: `Query::clauses()` exposes a flat preorder view of the existing AST with parent indices, original joiners, direct negation, resolved phrase slop and compiled fragments. It does not infer Boolean precedence or execute a search. `examples/inspect.rs` emits JSON; `examples/build_atlas.rs` writes the verified fixture data used by the dependency-free browser page. JSON is a development dependency only. The same crate source is vendored into Keyword Vault.
 
@@ -23,3 +23,9 @@ Validation must verify displayed outputs against generated Rust data. The graph 
 - Widths 320, 390, 768, 1024 and 1440 have no document overflow. Dark/light screenshots are real captures from `docs/capture-reference.py`.
 - No browser parser is duplicated. Arbitrary local input is supported by the Rust CLI; the browser is explicitly limited to the generated specimens.
 - The CLI and example generator use a development-only JSON dependency. Library source/tests match the Keyword Vault vendored copy.
+
+## Foundry revision
+
+The original source is now a first-class stage. All four stage tabs support Left/Right, Home and End, with the process strip reflecting the selected stage. Live readouts describe the selected Rust record: character count, normalization status, clause count and compilation readiness. The invalid specimen blocks copying and filtering while still allowing its structured error inspection to be exported. No parser logic or fixture output changed.
+
+Chrome checked all 64 specimen/mode/stage combinations, keyboard wrapping, process-strip state, and switching to an invalid specimen with an active filter. Existing capture verification checks all specimens, filter outputs, node selection, downloads and widths 320–1440. Screenshots use fresh contexts at their final viewport after local font loading and two animation frames.
